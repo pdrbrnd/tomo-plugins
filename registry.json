@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "Tomo Official Plugins",
+  "plugins": [
+    {
+      "id": "gutenberg",
+      "name": "Project Gutenberg",
+      "version": "2026-05-23T16:35:51Z",
+      "description": "Search and download public-domain books from Project Gutenberg.",
+      "homepage": "https://www.gutenberg.org",
+      "author": "Tomo",
+      "license": "MIT",
+      "minAppVersion": "1.6.0",
+      "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/gutenberg.js",
+      "sha256": "dd799f54fe257574ff588bc2a5b326aea6d00d125cf89edc26b833fe431bc87d",
+      "firstLaunchInstall": true
+    }
+  ]
+}
