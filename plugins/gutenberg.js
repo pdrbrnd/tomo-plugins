@@ -1,6 +1,11 @@
 // Project Gutenberg plugin for Tomo. Served from `pdrbrnd/tomo-plugins`.
-// Reference example — see docs/plugins.md for the full contract and
-// docs/CONTRACT.md for host capabilities per app version.
+//
+// Talks to gutendex.com — the de-facto JSON API for Project Gutenberg
+// metadata. Earlier versions of this plugin scraped PG's HTML search
+// page, but `/ebooks/search/?query=` is now aggressively rate-limited
+// (504s under sustained traffic) and PG themselves point developers at
+// gutendex to take pressure off the HTML pages. JSON is also a lot less
+// fragile than CSS selectors against a 25-year-old Plone site.
 
 const manifest = {
   id: "gutenberg",
@@ -14,65 +19,71 @@ const manifest = {
 };
 
 const PG_BASE = "https://www.gutenberg.org";
+const API_BASE = "https://gutendex.com";
 
 async function search(query) {
-  // Project Gutenberg only serves EPUB (their other formats — kindle,
-  // plain text, HTML — aren't first-class library imports for Tomo).
-  // If the user explicitly asked for a different format, skip the
-  // network round-trip and return empty.
+  // Project Gutenberg only serves EPUB as a first-class library import
+  // for Tomo (kindle/HTML/plain text aren't surfaced). If the user
+  // explicitly asked for a different format, skip the round-trip.
   if (query.format && query.format.toLowerCase() !== "epub") return [];
 
-  // PG's search box is free-text only — title / author / subject all
-  // funnel through the one `query=` param. ISBN-only or publisher-only
-  // queries can't be expressed; without text we'd just GET the front
-  // page and return random "results", so bail out.
+  // gutendex's `search=` param is free-text across title + author. ISBN
+  // and publisher aren't indexed; without text we'd just paginate the
+  // whole catalogue, so bail.
   const text = [query.text, query.title, query.author]
     .filter((s) => s && s.trim().length > 0)
     .join(" ")
     .trim();
   if (!text) return [];
 
-  const url = `${PG_BASE}/ebooks/search/?query=${encodeURIComponent(text)}`;
+  const url = `${API_BASE}/books?search=${encodeURIComponent(text)}`;
   console.log(`fetching ${url}`);
   const r = await fetch(url);
   console.log(`status ${r.status}, ${r.body.length} bytes`);
-  if (!r.ok) return [];
+  if (!r.ok) {
+    console.error(`gutendex returned HTTP ${r.status}`);
+    return [];
+  }
 
-  // Project Gutenberg's results live in <li class="booklink"> with nested
-  // .title and .subtitle. The link's href is /ebooks/<id>.
-  const items = querySelectorAll(r.body, "li.booklink");
-  console.log(`found ${items.length} raw items`);
+  let payload;
+  try {
+    payload = JSON.parse(r.body);
+  } catch (e) {
+    console.error(`gutendex JSON parse failed: ${e.message}`);
+    return [];
+  }
+
+  const books = Array.isArray(payload?.results) ? payload.results : [];
+  console.log(`found ${books.length} raw results`);
 
   const results = [];
-  for (const item of items) {
-    const titles = querySelectorAll(item.html, "span.title");
-    const authors = querySelectorAll(item.html, "span.subtitle");
-    const links = querySelectorAll(item.html, "a.link");
+  for (const book of books) {
+    if (typeof book.id !== "number" || !book.title) continue;
+    // Skip books without an EPUB — PG carries some plain-text-only items.
+    const epubURL = book.formats?.["application/epub+zip"];
+    if (!epubURL) continue;
 
-    const title = titles[0]?.text || "";
-    const author = authors[0]?.text || "";
-    const href = links[0]?.attrs?.href || "";
-    if (!title || !href) continue;
-
-    const idMatch = href.match(/\/ebooks\/(\d+)/);
-    if (!idMatch) continue;
-    const id = idMatch[1];
-
-    // PG covers live at a predictable cache path. Most books have one;
-    // the URL 404s for those that don't and the app's typography
-    // fallback takes over — no special handling needed here.
-    const coverURL = `${PG_BASE}/cache/epub/${id}/pg${id}.cover.medium.jpg`;
+    const id = String(book.id);
+    const authors = (book.authors || [])
+      .map((a) => flipLibraryName(a?.name))
+      .filter(Boolean);
+    const language = (book.languages || [])[0] || "";
+    // Most PG entries carry a JPEG cover at a predictable path; gutendex
+    // surfaces the URL directly under image/jpeg.
+    const coverURL =
+      book.formats?.["image/jpeg"] ||
+      `${PG_BASE}/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 
     results.push({
       id,
-      title,
-      authors: author ? [author] : [],
+      title: book.title,
+      authors,
       year: null,
-      language: "",
+      language,
       format: "epub",
       sizeBytes: null,
       coverURL,
-      detailURL: `${PG_BASE}${href}`,
+      detailURL: `${PG_BASE}/ebooks/${id}`,
       metadata: [
         { key: "Catalogue ID", value: `PG #${id}` },
         { key: "License", value: "Public domain" },
@@ -84,8 +95,24 @@ async function search(query) {
 }
 
 async function download(result) {
-  // Project Gutenberg EPUB direct URL pattern: /ebooks/<id>.epub3.images
+  // PG's direct EPUB URL is a pure function of the id — no detail-page
+  // round-trip needed. `.epub3.images` is the modern EPUB3 build (the
+  // `.images` suffix isn't optional; the no-images variant is older).
   const url = `${PG_BASE}/ebooks/${result.id}.epub3.images`;
   console.log(`download URL: ${url}`);
   return url;
+}
+
+// gutendex returns authors in library catalogue order ("Shelley, Mary
+// Wollstonecraft"). Flip to natural reading order for display, matching
+// what the old HTML-scraping path produced.
+function flipLibraryName(name) {
+  if (typeof name !== "string") return "";
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  const comma = trimmed.indexOf(",");
+  if (comma < 0) return trimmed;
+  const last = trimmed.slice(0, comma).trim();
+  const rest = trimmed.slice(comma + 1).trim();
+  return rest ? `${rest} ${last}` : last;
 }
