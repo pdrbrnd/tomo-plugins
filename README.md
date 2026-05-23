@@ -25,7 +25,8 @@ Users can add third-party registries by URL in Settings → Plugins → Registri
 
 ```
 plugins/
-  gutenberg.js                  # the plugin source
+  gutenberg.js                  # Project Gutenberg
+  standard-ebooks.js            # Standard Ebooks
 scripts/
   build-registry.mjs            # regenerates registry.json
 .github/workflows/
