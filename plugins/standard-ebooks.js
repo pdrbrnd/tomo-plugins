@@ -48,20 +48,31 @@ async function search(query) {
 
   const results = [];
   for (const item of items) {
-    // Title link carries the slug pair `/ebooks/<author>/<title>` plus
-    // the title text inside a schema:name span.
-    const titleAnchors = querySelectorAll(item.html, "a[property='schema:url']");
-    if (titleAnchors.length === 0) continue;
-    const detailPath = (titleAnchors[0].attrs?.href || "").trim();
+    // Each result item carries two anchors with property='schema:url':
+    // one wrapping the cover thumbnail (no title span inside) and one
+    // wrapping the title text (with a schema:name span). The thumbnail
+    // anchor comes first in DOM order, so picking [0] gives us an empty
+    // title and the item gets dropped. Walk the anchors and pick the one
+    // that actually carries the title span.
+    const anchors = querySelectorAll(item.html, "a[property='schema:url']");
+    let titleAnchor = null;
+    let titleSpan = null;
+    for (const a of anchors) {
+      const spans = querySelectorAll(a.html, "span[property='schema:name']");
+      if (spans.length > 0) {
+        titleAnchor = a;
+        titleSpan = spans[0];
+        break;
+      }
+    }
+    if (!titleAnchor) continue;
+
+    const detailPath = (titleAnchor.attrs?.href || "").trim();
     const slugMatch = detailPath.match(/^\/ebooks\/([^/]+)\/([^/]+)\/?$/);
     if (!slugMatch) continue;
     const slug = `${slugMatch[1]}/${slugMatch[2]}`;
 
-    const titleSpans = querySelectorAll(
-      titleAnchors[0].html,
-      "span[property='schema:name']",
-    );
-    const title = (titleSpans[0]?.text || titleAnchors[0].text || "").trim();
+    const title = (titleSpan?.text || titleAnchor.text || "").trim();
     if (!title) continue;
 
     // Author lives in a separate <p class="author"> sibling. Each link is
