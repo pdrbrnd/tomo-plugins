@@ -28,12 +28,6 @@ const OUTPUT = "registry.json";
 
 const REGISTRY_NAME = "Tomo Official Plugins";
 
-// Plugins seeded on first launch when the user is online. Tomo's bundled
-// `gutenberg.js` covers the offline case; everyone else gets the live copy.
-// This is a registry-curator decision (kept out of the per-plugin manifest
-// because plugins shouldn't be able to claim it themselves).
-const FIRST_LAUNCH_INSTALL = new Set(["gutenberg"]);
-
 function extractManifest(source) {
   // Strip comments before scanning so example manifests inside doc comments
   // don't get matched ahead of the real declaration. Crude but adequate for
@@ -100,9 +94,6 @@ function buildEntry(filename) {
     minAppVersion: manifest.minAppVersion ?? null,
     url,
     sha256: sha,
-    // Field is omitted (not `false`) when not promoted so the Swift
-    // decoder's optional field stays nil — keeps the JSON tight.
-    ...(FIRST_LAUNCH_INSTALL.has(manifest.id) ? { firstLaunchInstall: true } : {}),
   };
 }
 

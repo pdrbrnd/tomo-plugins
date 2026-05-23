@@ -56,8 +56,7 @@ Anything that searches a shadow library or scrapes copyrighted material does not
 
 1. Write the `.js` file following the [plugin contract](https://github.com/pdrbrnd/tomo/blob/main/docs/plugins.md). Declare `const manifest = { … }` with at least `id`. Set `minAppVersion` to the lowest Tomo release with every host capability the plugin uses ([CONTRACT.md](https://github.com/pdrbrnd/tomo/blob/main/docs/CONTRACT.md)).
 2. Drop it into `plugins/`. The filename is irrelevant at runtime (Tomo writes it as `<id>.js` on the client) but should match `<id>.js` for tidiness here.
-3. (Optional) If the plugin should be seeded on first launch for new users, add its id to `FIRST_LAUNCH_INSTALL` in `scripts/build-registry.mjs`. Reserve this for the bare-essentials default — currently just `gutenberg`.
-4. Open a PR. CI verifies the build; on merge, `registry.json` regenerates automatically.
+3. Open a PR. CI verifies the build; on merge, `registry.json` regenerates automatically.
 
 ## Updating a plugin
 
