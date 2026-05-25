@@ -48,31 +48,25 @@ async function search(query) {
 
   const results = [];
   for (const item of items) {
-    // Each result item carries two anchors with property='schema:url':
-    // one wrapping the cover thumbnail (no title span inside) and one
-    // wrapping the title text (with a schema:name span). The thumbnail
-    // anchor comes first in DOM order, so picking [0] gives us an empty
-    // title and the item gets dropped. Walk the anchors and pick the one
-    // that actually carries the title span.
-    const anchors = querySelectorAll(item.html, "a[property='schema:url']");
-    let titleAnchor = null;
-    let titleSpan = null;
-    for (const a of anchors) {
-      const spans = querySelectorAll(a.html, "span[property='schema:name']");
-      if (spans.length > 0) {
-        titleAnchor = a;
-        titleSpan = spans[0];
-        break;
-      }
-    }
-    if (!titleAnchor) continue;
-
-    const detailPath = (titleAnchor.attrs?.href || "").trim();
-    const slugMatch = detailPath.match(/^\/ebooks\/([^/]+)\/([^/]+)\/?$/);
+    // Canonical detail path lives on the <li>'s `about` attribute. Using
+    // it avoids picking between the three `schema:url` anchors inside (one
+    // wraps the cover, one the title, one the author).
+    //
+    // SE slugs are 2 or 3 segments: `/ebooks/<author>/<title>` for native
+    // works, `/ebooks/<author>/<title>/<translator>` for translations. The
+    // earlier 2-segment-only regex silently dropped every translated work
+    // — Tolstoy, Dostoevsky, Dumas, etc. — and the user saw an empty
+    // result set with no error.
+    const detailPath = (item.attrs?.about || "").trim();
+    const slugMatch = detailPath.match(/^\/ebooks\/((?:[^/]+\/){1,2}[^/]+)\/?$/);
     if (!slugMatch) continue;
-    const slug = `${slugMatch[1]}/${slugMatch[2]}`;
+    const slug = slugMatch[1];
 
-    const title = (titleSpan?.text || titleAnchor.text || "").trim();
+    const titleSpan = querySelectorAll(
+      item.html,
+      "span[property='schema:name']",
+    )[0];
+    const title = (titleSpan?.text || "").trim();
     if (!title) continue;
 
     // Author lives in a separate <p class="author"> sibling. Each link is
@@ -107,9 +101,21 @@ async function search(query) {
 }
 
 async function download(result) {
-  // SE's direct EPUB URL is a pure function of the slug pair — no detail
-  // page round-trip needed.
-  //   /ebooks/<author>/<title>/downloads/<author>_<title>.epub
-  const [author, title] = result.id.split("/");
-  return `${BASE}/ebooks/${author}/${title}/downloads/${author}_${title}.epub`;
+  // SE's direct EPUB URL is a pure function of the slug — no detail-page
+  // round-trip needed. Two quirks:
+  //
+  // 1. Without `?source=download` the server returns an XHTML interstitial
+  //    ("Your Download Has Started!") with a `<meta http-equiv="refresh">`
+  //    pointing at the same URL plus the query param. URLSession doesn't
+  //    follow HTML meta-refreshes, so the .epub file ends up containing
+  //    HTML and the import fails (NSURLErrorDomain -1011 / bad server
+  //    response, since the response type doesn't match the request).
+  //
+  // 2. The EPUB filename joins path segments with `_`, but any `_` *inside*
+  //    a segment (used to join co-authors or multi-translators) becomes
+  //    `-`. So `joseph-conrad_ford-madox-ford/the-nature-of-a-crime`
+  //    resolves to `joseph-conrad-ford-madox-ford_the-nature-of-a-crime`.
+  const segments = result.id.split("/");
+  const filename = segments.map((s) => s.replace(/_/g, "-")).join("_");
+  return `${BASE}/ebooks/${result.id}/downloads/${filename}.epub?source=download`;
 }

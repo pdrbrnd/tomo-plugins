@@ -17,14 +17,14 @@
     {
       "id": "standard-ebooks",
       "name": "Standard Ebooks",
-      "version": "2026-05-23T20:57:36Z",
+      "version": "2026-05-23T19:52:58Z",
       "description": "Curated public-domain ebooks with modern EPUB3 and careful editorial polish.",
       "homepage": "https://standardebooks.org",
       "author": "pdrbrnd",
       "license": "MIT",
       "minAppVersion": "1.7.0",
       "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/standard-ebooks.js",
-      "sha256": "7aeaf74d155238dff0ba2e5c417413005c7a18c033b9f9eea4f5f9dbbe65e0c8"
+      "sha256": "0e357b8c333c2ab708c3ab174f72d81005a549ac842372b191e1551518978149"
     }
   ]
 }
