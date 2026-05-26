@@ -5,7 +5,7 @@
     {
       "id": "gutenberg",
       "name": "Project Gutenberg",
-      "version": "2026-05-25T14:31:34Z",
+      "version": "2026-05-23T20:57:36Z",
       "description": "Search and download public-domain books from Project Gutenberg.",
       "homepage": "https://www.gutenberg.org",
       "author": "Tomo",
@@ -24,7 +24,7 @@
       "license": "MIT",
       "minAppVersion": "1.7.0",
       "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/standard-ebooks.js",
-      "sha256": "0e357b8c333c2ab708c3ab174f72d81005a549ac842372b191e1551518978149"
+      "sha256": "50659a481174b911250b904bf6dc8230a54f899a971d34ece7fea8c5c242f7a0"
     }
   ]
 }

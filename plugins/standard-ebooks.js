@@ -43,7 +43,12 @@ async function search(query) {
     return [];
   }
 
-  const items = querySelectorAll(r.body, "ol.ebooks-list li");
+  // `.not-pd` marks books SE lists for discoverability but doesn't yet host
+  // — typically still under U.S. copyright (e.g. Orwell until 2045). The
+  // detail page is a placeholder; the `/downloads/*.epub` and cover URLs
+  // 404, which surfaces as a -1011 download failure with no cover. Filter
+  // these out so they never become search results.
+  const items = querySelectorAll(r.body, "ol.ebooks-list li:not(.not-pd)");
   console.log(`found ${items.length} raw items`);
 
   const results = [];
