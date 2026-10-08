@@ -1,11 +1,11 @@
 // Project Gutenberg plugin for Tomo. Served from `pdrbrnd/tomo-plugins`.
 //
-// Talks to gutendex.com — the de-facto JSON API for Project Gutenberg
-// metadata. Earlier versions of this plugin scraped PG's HTML search
-// page, but `/ebooks/search/?query=` is now aggressively rate-limited
-// (504s under sustained traffic) and PG themselves point developers at
-// gutendex to take pressure off the HTML pages. JSON is also a lot less
-// fragile than CSS selectors against a 25-year-old Plone site.
+// Scrapes PG's own HTML search (`/ebooks/search/`). An earlier version
+// used gutendex.com, but by Oct 2026 its origin was overloaded: only
+// Cloudflare-cached queries came back fast, and a cache miss took 20-70s
+// (past Tomo's 30s fetch timeout) or returned an Apache 503. PG's search
+// answers in under a second. It does rate-limit bursts, but one debounced
+// search per keystroke pause is well inside that.
 
 const manifest = {
   id: "gutenberg",
@@ -19,70 +19,61 @@ const manifest = {
 };
 
 const PG_BASE = "https://www.gutenberg.org";
-const API_BASE = "https://gutendex.com";
+
+// PG appends " (Portuguese)" etc. to non-English titles; English titles
+// carry no suffix. Unknown names map to "" and Tomo classifies on import.
+const LANGUAGE_CODES = {
+  English: "en", French: "fr", German: "de", Spanish: "es",
+  Portuguese: "pt", Italian: "it", Dutch: "nl", Finnish: "fi",
+  Swedish: "sv", Danish: "da", Norwegian: "no", Polish: "pl",
+  Russian: "ru", Hungarian: "hu", Czech: "cs", Greek: "el",
+  Latin: "la", Catalan: "ca", Esperanto: "eo", Tagalog: "tl",
+  Chinese: "zh", Japanese: "ja", Welsh: "cy", Irish: "ga",
+};
 
 async function search(query) {
-  // Project Gutenberg only serves EPUB as a first-class library import
-  // for Tomo (kindle/HTML/plain text aren't surfaced). If the user
-  // explicitly asked for a different format, skip the round-trip.
+  // Only EPUB is surfaced; if the user asked for another format, skip.
   if (query.format && query.format.toLowerCase() !== "epub") return [];
 
-  // gutendex's `search=` param is free-text across title + author. ISBN
-  // and publisher aren't indexed; without text we'd just paginate the
-  // whole catalogue, so bail.
   const text = [query.text, query.title, query.author]
     .filter((s) => s && s.trim().length > 0)
     .join(" ")
     .trim();
   if (!text) return [];
 
-  const url = `${API_BASE}/books?search=${encodeURIComponent(text)}`;
+  // `!cat.audio` drops audiobooks: they look identical to texts in the
+  // result list but have no EPUB, so download() would 404.
+  const url = `${PG_BASE}/ebooks/search/?query=${encodeURIComponent(`${text} !cat.audio`)}`;
   console.log(`fetching ${url}`);
   const r = await fetch(url);
-  console.log(`status ${r.status}, ${r.body.length} bytes`);
   if (!r.ok) {
-    console.error(`gutendex returned HTTP ${r.status}`);
+    console.error(`search failed: HTTP ${r.status}`);
     return [];
   }
 
-  let payload;
-  try {
-    payload = JSON.parse(r.body);
-  } catch (e) {
-    console.error(`gutendex JSON parse failed: ${e.message}`);
-    return [];
-  }
-
-  const books = Array.isArray(payload?.results) ? payload.results : [];
-  console.log(`found ${books.length} raw results`);
-
+  // Non-book rows ("Authors", "Subjects", "No records found.") are also
+  // `li.booklink` but don't link to /ebooks/<id>, so the id check drops them.
+  const items = querySelectorAll(r.body, "li.booklink");
   const results = [];
-  for (const book of books) {
-    if (typeof book.id !== "number" || !book.title) continue;
-    // Skip books without an EPUB — PG carries some plain-text-only items.
-    const epubURL = book.formats?.["application/epub+zip"];
-    if (!epubURL) continue;
+  for (const item of items) {
+    const href = querySelectorAll(item.html, "a.link")[0]?.attrs?.href || "";
+    const id = href.match(/^\/ebooks\/(\d+)$/)?.[1];
+    if (!id) continue;
 
-    const id = String(book.id);
-    const authors = (book.authors || [])
-      .map((a) => flipLibraryName(a?.name))
-      .filter(Boolean);
-    const language = (book.languages || [])[0] || "";
-    // Most PG entries carry a JPEG cover at a predictable path; gutendex
-    // surfaces the URL directly under image/jpeg.
-    const coverURL =
-      book.formats?.["image/jpeg"] ||
-      `${PG_BASE}/cache/epub/${id}/pg${id}.cover.medium.jpg`;
+    const rawTitle = (querySelectorAll(item.html, "span.title")[0]?.text || "").trim();
+    if (!rawTitle) continue;
+    const { title, language } = splitLanguageSuffix(rawTitle);
+    const author = (querySelectorAll(item.html, "span.subtitle")[0]?.text || "").trim();
 
     results.push({
       id,
-      title: book.title,
-      authors,
+      title,
+      authors: author ? [author] : [],
       year: null,
       language,
       format: "epub",
       sizeBytes: null,
-      coverURL,
+      coverURL: `${PG_BASE}/cache/epub/${id}/pg${id}.cover.medium.jpg`,
       detailURL: `${PG_BASE}/ebooks/${id}`,
       metadata: [
         { key: "Catalogue ID", value: `PG #${id}` },
@@ -90,29 +81,23 @@ async function search(query) {
       ],
     });
   }
-  console.log(`returning ${results.length} parsed results`);
+  console.log(`returning ${results.length} results`);
   return results;
 }
 
 async function download(result) {
-  // PG's direct EPUB URL is a pure function of the id — no detail-page
-  // round-trip needed. `.epub3.images` is the modern EPUB3 build (the
-  // `.images` suffix isn't optional; the no-images variant is older).
-  const url = `${PG_BASE}/ebooks/${result.id}.epub3.images`;
-  console.log(`download URL: ${url}`);
-  return url;
+  // PG's direct EPUB URL is a pure function of the id. `.epub3.images` is
+  // the modern EPUB3 build.
+  return `${PG_BASE}/ebooks/${result.id}.epub3.images`;
 }
 
-// gutendex returns authors in library catalogue order ("Shelley, Mary
-// Wollstonecraft"). Flip to natural reading order for display, matching
-// what the old HTML-scraping path produced.
-function flipLibraryName(name) {
-  if (typeof name !== "string") return "";
-  const trimmed = name.trim();
-  if (!trimmed) return "";
-  const comma = trimmed.indexOf(",");
-  if (comma < 0) return trimmed;
-  const last = trimmed.slice(0, comma).trim();
-  const rest = trimmed.slice(comma + 1).trim();
-  return rest ? `${rest} ${last}` : last;
+// "Os Maias (Portuguese)" -> { title: "Os Maias", language: "pt" }.
+// Also tidies PG's "Title :  Subtitle" spacing.
+function splitLanguageSuffix(rawTitle) {
+  const tidy = (s) => s.replace(/\s+:\s+/g, ": ").trim();
+  const match = rawTitle.match(/^(.*)\s+\(([A-Z][a-z]+)\)$/);
+  if (match && LANGUAGE_CODES[match[2]]) {
+    return { title: tidy(match[1]), language: LANGUAGE_CODES[match[2]] };
+  }
+  return { title: tidy(rawTitle), language: match ? "" : "en" };
 }

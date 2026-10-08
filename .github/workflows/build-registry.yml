@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: build-registry.mjs reads each plugin's last
+          # commit time as its version. A shallow clone makes every
+          # plugin report the HEAD commit's time.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
