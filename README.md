@@ -26,7 +26,9 @@ Users can add third-party registries by URL in Settings → Plugins → Registri
 ```
 plugins/
   gutenberg.js                  # Project Gutenberg
+  projecto-adamastor.js         # Projecto Adamastor (pt-PT classics)
   standard-ebooks.js            # Standard Ebooks
+  wikisource.js                 # Wikisource (en, pt, fr, de, it, es)
 scripts/
   build-registry.mjs            # regenerates registry.json
 .github/workflows/
