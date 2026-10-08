@@ -5,14 +5,26 @@
     {
       "id": "gutenberg",
       "name": "Project Gutenberg",
-      "version": "2026-05-26T08:56:28Z",
+      "version": "2026-10-08T19:39:59Z",
       "description": "Search and download public-domain books from Project Gutenberg.",
       "homepage": "https://www.gutenberg.org",
       "author": "Tomo",
       "license": "MIT",
       "minAppVersion": "1.7.0",
       "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/gutenberg.js",
-      "sha256": "817e35cf2c985d8a722ae1c60dfaf0962f7892edbc5dbb1593fe0ea2032773ef"
+      "sha256": "8f0270c6a64757f2815a8cf528fb909d5cb07aeb9bbadca2c3825956c30e0bd8"
+    },
+    {
+      "id": "projecto-adamastor",
+      "name": "Projecto Adamastor",
+      "version": "2026-10-08T19:47:24Z",
+      "description": "Portuguese public-domain classics, revised to the 1945 orthography (pt-PT).",
+      "homepage": "https://projectoadamastor.org",
+      "author": "Tomo",
+      "license": "MIT",
+      "minAppVersion": "1.7.0",
+      "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/projecto-adamastor.js",
+      "sha256": "25c6e49e77fbbe5b14deaae8157564433c524da6960987209a2ce32c835951a4"
     },
     {
       "id": "standard-ebooks",
@@ -25,6 +37,18 @@
       "minAppVersion": "1.7.0",
       "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/standard-ebooks.js",
       "sha256": "50659a481174b911250b904bf6dc8230a54f899a971d34ece7fea8c5c242f7a0"
+    },
+    {
+      "id": "wikisource",
+      "name": "Wikisource",
+      "version": "2026-10-08T19:47:24Z",
+      "description": "Search and download public-domain texts from Wikisource in English, Portuguese, French, German, Italian and Spanish.",
+      "homepage": "https://wikisource.org",
+      "author": "Tomo",
+      "license": "MIT",
+      "minAppVersion": "1.7.0",
+      "url": "https://raw.githubusercontent.com/pdrbrnd/tomo-plugins/main/plugins/wikisource.js",
+      "sha256": "16990cafc662efe1502fc291f7b9a4aab2f3958d1d66cb0b35f0c3b601a87eb8"
     }
   ]
 }
